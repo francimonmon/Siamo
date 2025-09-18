@@ -92,7 +92,6 @@ a {
     background-color: var(--primary-color);
 }
 
-
 /* --- Splash Screen (Pantalla de Carga) --- */
 #splash-screen {
     position: fixed;
@@ -211,7 +210,6 @@ a {
     width: 100%;
 }
 
-
 /* --- Sección Hero --- */
 .hero {
     position: relative;
@@ -270,7 +268,6 @@ a {
     font-weight: 300;
     text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
 }
-
 
 /* --- Sección de Productos Destacados --- */
 .featured-products {
@@ -343,7 +340,6 @@ a {
     display: block; /* Para que tome su propia línea */
 }
 
-
 /* --- Sección Acerca de Nosotros --- */
 .about-us {
     background-color: var(--primary-color);
@@ -380,11 +376,27 @@ a {
     transform: translateX(0);
 }
 
+.about-text h3 {
+    color: var(--text-light);
+    font-size: 2rem;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+}
+
 .about-text p {
     font-size: 1.1rem;
     margin-bottom: 1.2rem;
     line-height: 1.8;
     font-weight: 300;
+}
+
+.location-info {
+    text-align: center;
+}
+
+.location-text {
+    font-style: italic;
+    color: var(--accent-color);
 }
 
 .about-image {
@@ -397,6 +409,42 @@ a {
     max-width: 450px;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.social-links {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.social-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-light);
+    border-radius: 8px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.social-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.1);
+}
+
+.social-btn i {
+    font-size: 1.5rem;
+}
+
+.whatsapp {
+    background-color: #25D366;
+}
+
+.instagram {
+    background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);
 }
 
 /* --- Sección de Contacto --- */
@@ -503,7 +551,7 @@ a {
         text-align: center;
     }
 
-    .about-text h2 {
+    .about-text h2, .about-text h3 {
         text-align: center;
     }
 
@@ -514,6 +562,11 @@ a {
 
     .about-image {
         order: -1; /* Mueve la imagen arriba en móvil */
+    }
+
+    .social-links {
+        flex-direction: column;
+        align-items: center;
     }
 }
 
@@ -582,7 +635,7 @@ a {
         font-size: 1.1rem;
     }
 
-    .about-text h2 {
+    .about-text h2, .about-text h3 {
         font-size: 2.2rem;
     }
     .about-text p {
