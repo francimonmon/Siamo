@@ -1,204 +1,311 @@
-/**
- * Archivo de JavaScript para la página web de Siamo Indumentaria.
- * Incluye la lógica para la pantalla de carga, el encabezado fijo y las funcionalidades dinámicas.
- */
+// Firebase SDK
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, collection, addDoc, onSnapshot, serverTimestamp, setDoc, deleteDoc, getDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Mensaje de depuración para confirmar que el script se está ejecutando.
-console.log('Script cargado y en ejecución.');
+// Inicialización de la aplicación
+console.log("Iniciando aplicación...");
 
-// URL y clave para la API de Gemini
-// NOTA: La clave API se proporcionará automáticamente en el entorno de Canvas.
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
-const API_KEY = ""; // La clave se inyectará en tiempo de ejecución.
+// Variables globales proporcionadas por el entorno de Canvas
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-/**
- * Muestra una caja de mensajes personalizada en lugar de `alert()`.
- * @param {string} message El mensaje a mostrar.
- */
-function showCustomMessage(message) {
-    const messageBox = document.createElement('div');
-    messageBox.classList.add('custom-message-box');
-    messageBox.innerHTML = `
-        <div class="message-content">
-            <p>${message}</p>
-            <button class="btn btn-small" onclick="this.parentNode.parentNode.remove()">Cerrar</button>
-        </div>
-    `;
-    document.body.appendChild(messageBox);
+// Referencias a elementos del DOM
+const productsGrid = document.getElementById('products-grid');
+const cartCountEl = document.getElementById('cart-count');
+const cartItemsEl = document.getElementById('cart-items');
+const cartTotalEl = document.getElementById('cart-total');
+const cartModal = document.getElementById('cart-modal');
+const messageModal = document.getElementById('message-modal');
+const messageTitle = document.getElementById('message-title');
+const messageBody = document.getElementById('message-body');
+const userInfoEl = document.getElementById('user-info');
+const productForm = document.getElementById('product-form');
+const filterTypeEl = document.getElementById('filter-type');
+const filterSizeEl = document.getElementById('filter-size');
+const filterPriceEl = document.getElementById('filter-price');
 
-    // Estilos para la caja de mensajes
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .custom-message-box {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            color: white;
-        }
-        .message-content {
-            background: #fff;
-            padding: 20px 30px;
-            border-radius: 8px;
-            color: #333;
-        }
-    `;
-    document.head.appendChild(style);
+let db, auth, userId;
+
+// Función para mostrar mensajes personalizados (modal)
+function showMessage(title, body) {
+    if (messageTitle && messageBody && messageModal) {
+        messageTitle.textContent = title;
+        messageBody.textContent = body;
+        messageModal.style.display = 'flex';
+    }
 }
 
-/**
- * Función para generar eslóganes de productos utilizando la API de Gemini.
- * @param {string} productName El nombre del producto.
- * @returns {Promise<string>} El eslogan generado.
- */
-async function generateSlogan(productName) {
-    const prompt = `Crea un eslogan corto y llamativo de 10 palabras o menos para el producto de ropa: "${productName}".`;
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-    };
-
-    let attempts = 0;
-    const maxAttempts = 3;
-    while (attempts < maxAttempts) {
+// Inicializar Firebase
+if (Object.keys(firebaseConfig).length > 0) {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    
+    // Autenticar al usuario
+    const signIn = async () => {
         try {
-            const response = await fetch(API_URL + API_KEY, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            const slogan = result?.candidates?.[0]?.content?.parts?.[0]?.text || 'Calidad y estilo en cada prenda.';
-            return slogan;
-        } catch (error) {
-            console.error(`Error al generar eslogan (Intento ${attempts + 1}):`, error);
-            attempts++;
-            if (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
+            } else {
+                await signInAnonymously(auth);
             }
+        } catch (error) {
+            console.error("Error de autenticación:", error);
+            showMessage('Error de Autenticación', 'No se pudo iniciar sesión. Por favor, recargue la página.');
         }
-    }
-    return 'Calidad y estilo en cada prenda.';
-}
-
-/**
- * Función para calcular la talla de ropa usando la API de Gemini.
- * @param {number} height Altura del usuario en cm.
- * @param {number} weight Peso del usuario en kg.
- * @param {string} bodyShape Forma del cuerpo del usuario.
- * @returns {Promise<string>} La recomendación de talla generada.
- */
-async function calculateSize(height, weight, bodyShape) {
-    const prompt = `Basado en los siguientes datos: Altura: ${height} cm, Peso: ${weight} kg, Forma del cuerpo: ${bodyShape}, por favor, recomienda una talla de ropa (ej. S, M, L, XL) y justifica brevemente tu recomendación en una sola frase. El resultado debe ser solo la talla recomendada y la justificación.`;
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
     };
+    
+    signIn();
 
-    let attempts = 0;
-    const maxAttempts = 3;
-    while (attempts < maxAttempts) {
-        try {
-            const response = await fetch(API_URL + API_KEY, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            const recommendation = result?.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo generar una recomendación de talla en este momento. Por favor, intente de nuevo más tarde.';
-            return recommendation;
-        } catch (error) {
-            console.error(`Error al calcular talla (Intento ${attempts + 1}):`, error);
-            attempts++;
-            if (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
-            }
-        }
-    }
-    return 'No se pudo generar una recomendación de talla en este momento. Por favor, intente de nuevo más tarde.';
-}
-
-window.onload = function() {
-    console.log('Página completamente cargada.');
-
-    const splashScreen = document.getElementById('splash-screen');
-    const mainHeader = document.getElementById('main-header');
-    const mainContent = document.getElementById('main-content');
-    const splashLogo = document.getElementById('splash-logo-img');
-    const splashSlogan = document.getElementById('splash-slogan');
-
-    // Efecto de la pantalla de inicio
-    if (splashScreen && mainContent) {
-        setTimeout(() => {
-            splashScreen.style.opacity = '0';
-            setTimeout(() => {
-                splashScreen.style.display = 'none';
-                mainContent.style.opacity = '1';
-                mainHeader.style.transform = 'translateY(0)';
-                mainHeader.style.opacity = '1';
-            }, 1000); // Coincide con la duración de la transición en CSS
-        }, 2000); // 2 segundos para mostrar el logo y el eslogan
-    }
-
-    // Lógica para el encabezado fijo
-    if (mainHeader) {
-        let lastScrollY = window.scrollY;
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 100 && window.scrollY < lastScrollY) {
-                // Desplazamiento hacia arriba y ya hemos bajado un poco
-                mainHeader.style.transform = 'translateY(0)';
-            } else if (window.scrollY > lastScrollY || window.scrollY < 100) {
-                // Desplazamiento hacia abajo o al inicio de la página
-                mainHeader.style.transform = 'translateY(-100%)';
-            }
-            lastScrollY = window.scrollY;
-        });
-    }
-
-    // Funcionalidad de generación de eslóganes para los productos
-    const productCards = document.querySelectorAll('.product-card');
-    if (productCards.length > 0) {
-        productCards.forEach(async card => {
-            const productName = card.getAttribute('data-product-name');
-            const sloganElement = card.querySelector('.product-description');
-            const loadingElement = card.querySelector('.slogan-loading');
+    // Escuchar el estado de autenticación para obtener el ID de usuario
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            userId = user.uid;
+            if (userInfoEl) userInfoEl.textContent = `Usuario: ${userId}`;
             
-            if (sloganElement && productName) {
-                loadingElement.style.display = 'block';
-                const slogan = await generateSlogan(productName);
-                sloganElement.textContent = slogan;
-                loadingElement.style.display = 'none';
+            // Suscribirse a los cambios del carrito solo cuando el usuario está autenticado
+            onSnapshot(collection(db, `artifacts/${appId}/users/${userId}/cart`), (snapshot) => {
+                const cartItems = [];
+                snapshot.forEach(doc => {
+                    cartItems.push({ id: doc.id, ...doc.data() });
+                });
+                updateCartUI(cartItems);
+            });
+        } else {
+            if (userInfoEl) userInfoEl.textContent = "Usuario anónimo";
+        }
+    });
+
+} else {
+    console.error("Error: Configuración de Firebase no proporcionada.");
+    if (userInfoEl) userInfoEl.textContent = "Error: Configuración de Firebase faltante";
+}
+
+// Renderiza un producto en la página
+function renderProduct(product) {
+    if (!productsGrid) return; // Salir si no estamos en la página de productos
+    const productCard = document.createElement('div');
+    productCard.classList.add('product-card');
+    productCard.innerHTML = `
+        <img src="${product.image}" alt="${product.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x400?text=No+Imagen'">
+        <h3>${product.name}</h3>
+        <p>${product.description}</p>
+        <p class="price">$${product.price.toFixed(2)}</p>
+        <button class="btn add-to-cart-btn" data-id="${product.id}">Añadir al carrito</button>
+    `;
+    productsGrid.appendChild(productCard);
+}
+
+// Actualiza el carrito en la UI desde Firestore
+function updateCartUI(cartItems) {
+    if (!cartCountEl || !cartItemsEl || !cartTotalEl) return;
+    
+    cartCountEl.textContent = cartItems.reduce((total, item) => total + item.quantity, 0);
+    cartItemsEl.innerHTML = '';
+    let total = 0;
+
+    cartItems.forEach(item => {
+        const li = document.createElement('li');
+        li.classList.add('cart-item');
+        li.innerHTML = `
+            <div class="cart-item-info">
+                <img src="${item.image}" alt="${item.name}">
+                <div class="cart-item-details">
+                    <h4>${item.name}</h4>
+                    <p>$${item.price.toFixed(2)}</p>
+                </div>
+            </div>
+            <div class="cart-item-actions">
+                <input type="number" value="${item.quantity}" min="1" data-id="${item.id}">
+                <i class="fas fa-trash-alt remove-item" data-id="${item.id}"></i>
+            </div>
+        `;
+        cartItemsEl.appendChild(li);
+        total += item.price * item.quantity;
+    });
+
+    cartTotalEl.textContent = `$${total.toFixed(2)}`;
+    
+    // Agregar eventos para actualizar cantidad y eliminar
+    cartItemsEl.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', async (e) => {
+            const id = e.target.dataset.id;
+            const newQuantity = parseInt(e.target.value);
+            if (newQuantity < 1) {
+                 e.target.value = 1;
+                 return;
+            }
+            try {
+                const cartRef = doc(db, `artifacts/${appId}/users/${userId}/cart`, id);
+                await setDoc(cartRef, { quantity: newQuantity }, { merge: true });
+            } catch (e) {
+                console.error("Error al actualizar la cantidad:", e);
             }
         });
-    }
+    });
 
-    // Funcionalidad del asistente de tallas
-    const sizeAssistantForm = document.getElementById('size-assistant-form');
-    if (sizeAssistantForm) {
-        sizeAssistantForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const height = document.getElementById('height').value;
-            const weight = document.getElementById('weight').value;
-            const bodyShape = document.getElementById('body-shape').value;
-            const resultDiv = document.getElementById('size-result');
-            const loadingSpan = document.getElementById('size-loading');
+    cartItemsEl.querySelectorAll('.remove-item').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.target.dataset.id;
+            try {
+                const cartRef = doc(db, `artifacts/${appId}/users/${userId}/cart`, id);
+                await deleteDoc(cartRef);
+            } catch (e) {
+                console.error("Error al eliminar el producto:", e);
+            }
+        });
+    });
+}
 
-            if (!height || !weight || !bodyShape) {
-                showCustomMessage('Por favor, completa todos los campos para obtener tu recomendación.');
+// Lógica de los botones del carrito y checkout
+if (document.getElementById('cart-icon')) {
+    document.getElementById('cart-icon').addEventListener('click', () => {
+        if (cartModal) cartModal.classList.add('show');
+    });
+}
+if (document.getElementById('close-cart')) {
+    document.getElementById('close-cart').addEventListener('click', () => {
+        if (cartModal) cartModal.classList.remove('show');
+    });
+}
+if (document.getElementById('checkout-btn')) {
+    document.getElementById('checkout-btn').addEventListener('click', async () => {
+        const cartItems = await getDocs(collection(db, `artifacts/${appId}/users/${userId}/cart`));
+        if (cartItems.empty) {
+            showMessage('Carrito Vacío', 'No hay productos en tu carrito para finalizar la compra.');
+            return;
+        }
+
+        try {
+            const cartDocs = await getDocs(collection(db, `artifacts/${appId}/users/${userId}/cart`));
+            cartDocs.forEach(async d => { await deleteDoc(d.ref); });
+
+            if (cartModal) cartModal.classList.remove('show');
+            showMessage('¡Compra Exitosa!', 'Tu pedido ha sido procesado. ¡Gracias por tu compra!');
+        } catch (e) {
+            console.error("Error al finalizar la compra:", e);
+            showMessage('Error', 'Hubo un problema al procesar tu compra. Por favor, inténtalo de nuevo.');
+        }
+    });
+}
+
+// Lógica para añadir productos al carrito en Firestore
+if (productsGrid) {
+    productsGrid.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('add-to-cart-btn')) {
+            const productId = e.target.dataset.id;
+            const productCard = e.target.closest('.product-card');
+            const productName = productCard.querySelector('h3').textContent;
+            const productPrice = parseFloat(productCard.querySelector('.price').textContent.replace('$', ''));
+            const productImage = productCard.querySelector('img').src;
+            
+            if (!userId) {
+                showMessage('Error', 'No se pudo agregar el producto. Intenta recargar la página.');
                 return;
             }
 
-            loadingSpan.style.display = 'block';
-            resultDiv.textContent = ''; // Limpiar el resultado anterior
+            try {
+                const cartRef = doc(db, `artifacts/${appId}/users/${userId}/cart`, productId);
+                const existingItem = await getDoc(cartRef);
+                
+                let newQuantity = 1;
+                if (existingItem.exists()) {
+                    newQuantity = existingItem.data().quantity + 1;
+                }
+                
+                await setDoc(cartRef, {
+                    name: productName,
+                    price: productPrice,
+                    image: productImage,
+                    quantity: newQuantity,
+                    createdAt: serverTimestamp()
+                }, { merge: true });
+                
+                showMessage('Producto Añadido', `Has añadido "${productName}" a tu carrito.`);
+            } catch (e) {
+                console.error("Error al añadir al carrito:", e);
+                showMessage('Error', 'No se pudo añadir el producto al carrito. Por favor, inténtalo de nuevo.');
+            }
+        }
+    });
+}
 
-            const recommendation = await calculateSize(height, weight, bodyShape);
-            
-            resultDiv.textContent = recommendation;
-            loadingSpan.style.display = 'none';
+// Lógica para el formulario de gestión de productos (solo en index.html)
+if (productForm) {
+    productForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('product-name').value;
+        const price = parseFloat(document.getElementById('product-price').value);
+        const type = document.getElementById('product-type').value;
+        const size = document.getElementById('product-size').value;
+        const image = document.getElementById('product-image').value;
+        const description = document.getElementById('product-description').value;
+
+        try {
+            await addDoc(collection(db, `artifacts/${appId}/public/data/products`), {
+                name,
+                price,
+                type,
+                size,
+                image,
+                description,
+                createdAt: serverTimestamp()
+            });
+            productForm.reset();
+            showMessage('Producto Agregado', `El producto "${name}" se ha añadido a la base de datos.`);
+        } catch (e) {
+            console.error("Error al agregar documento: ", e);
+            showMessage('Error', 'No se pudo agregar el producto. Por favor, inténtalo de nuevo.');
+        }
+    });
+}
+
+// Lógica de los filtros y carga de productos (solo en products.html)
+if (productsGrid && filterTypeEl && filterSizeEl && filterPriceEl) {
+    let unsubscribeProducts = null;
+
+    const applyFilters = () => {
+        if (unsubscribeProducts) unsubscribeProducts();
+
+        const type = filterTypeEl.value;
+        const size = filterSizeEl.value;
+        const price = parseFloat(filterPriceEl.value);
+
+        let productsQuery = collection(db, `artifacts/${appId}/public/data/products`);
+        let filters = [];
+
+        if (type !== 'all') {
+            filters.push(where('type', '==', type));
+        }
+        if (size !== 'all') {
+            filters.push(where('size', '==', size));
+        }
+        if (!isNaN(price) && price > 0) {
+            filters.push(where('price', '<=', price));
+        }
+
+        productsQuery = query(productsQuery, ...filters);
+
+        unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+            productsGrid.innerHTML = '';
+            const products = [];
+            snapshot.forEach(doc => {
+                products.push({ id: doc.id, ...doc.data() });
+            });
+            // Ordenamos en el cliente para evitar el error de índice de Firestore
+            products.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            products.forEach(product => renderProduct(product));
+        }, (error) => {
+            console.error("Error al obtener productos:", error);
         });
-    }
-};
+    };
+
+    filterTypeEl.addEventListener('change', applyFilters);
+    filterSizeEl.addEventListener('change', applyFilters);
+    filterPriceEl.addEventListener('input', applyFilters);
+
+    // Carga inicial de productos sin filtros
+    applyFilters();
+}
