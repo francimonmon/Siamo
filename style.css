@@ -330,6 +330,7 @@ a {
     color: var(--accent-color);
     margin-bottom: 1rem;
     flex-grow: 1; /* Para que todos los párrafos tengan la misma altura si el texto es distinto */
+    min-height: 50px; /* Evita saltos de diseño cuando el slogan cambia */
 }
 
 .product-price {
@@ -338,6 +339,14 @@ a {
     color: var(--primary-color);
     margin-bottom: 1.5rem;
     display: block; /* Para que tome su propia línea */
+}
+
+.slogan-loading {
+    font-size: 0.9rem;
+    color: var(--accent-color);
+    font-style: italic;
+    margin-top: 1rem;
+    display: none;
 }
 
 /* --- Sección Acerca de Nosotros --- */
@@ -411,40 +420,9 @@ a {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
-.social-links {
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-.social-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    font-size: 1.2rem;
-    font-weight: 600;
+.social-text {
+    font-size: 1.1rem;
     color: var(--text-light);
-    border-radius: 8px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.social-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.1);
-}
-
-.social-btn i {
-    font-size: 1.5rem;
-}
-
-.whatsapp {
-    background-color: #25D366;
-}
-
-.instagram {
-    background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);
 }
 
 /* --- Sección de Contacto --- */
@@ -502,6 +480,55 @@ a {
     margin: 0 auto;
 }
 
+.size-assistant {
+    margin-top: 5rem;
+    padding-top: 2rem;
+    border-top: 1px dashed #ccc;
+    text-align: center;
+}
+
+.size-assistant-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 400px;
+    margin: 2rem auto 0;
+}
+
+.form-group {
+    text-align: left;
+}
+
+.form-group label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.size-loading {
+    display: none;
+    font-size: 0.9rem;
+    color: #555;
+    font-style: italic;
+    margin-top: 1rem;
+}
+
+.size-result {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    background-color: var(--card-bg);
+    min-height: 50px;
+}
+
 /* --- Pie de página --- */
 .site-footer {
     text-align: center;
@@ -516,12 +543,16 @@ a {
     display: flex;
     justify-content: center;
     gap: 1.5rem;
+    flex-wrap: wrap; /* Permite que los enlaces se envuelvan en pantallas pequeñas */
 }
 
 .footer-links a {
     color: var(--text-light);
     opacity: 0.8;
     transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .footer-links a:hover {
@@ -529,7 +560,31 @@ a {
     text-decoration: underline;
 }
 
-/* --- Media Queries para Responsive Design --- */
+/* --- Botón flotante de WhatsApp --- */
+.whatsapp-float {
+    position: fixed;
+    width: 60px;
+    height: 60px;
+    bottom: 25px;
+    right: 25px;
+    background-color: #25D366;
+    color: #FFF;
+    border-radius: 50px;
+    text-align: center;
+    font-size: 30px;
+    box-shadow: 2px 2px 3px rgba(0,0,0,0.3);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.whatsapp-float:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+}
+
 @media (max-width: 900px) {
     .navbar {
         padding: 1rem 1.5rem;
@@ -564,9 +619,16 @@ a {
         order: -1; /* Mueve la imagen arriba en móvil */
     }
 
-    .social-links {
-        flex-direction: column;
-        align-items: center;
+    .whatsapp-float {
+        width: 50px;
+        height: 50px;
+        bottom: 20px;
+        right: 20px;
+        font-size: 25px;
+    }
+
+    .footer-links {
+        gap: 1rem;
     }
 }
 
